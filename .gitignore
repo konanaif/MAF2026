@@ -26,3 +26,5 @@ data/RH
 test_framework.py
 result/
 algorithms/inprocessing/DMLBG/logs/
+data/ALINCredit/*
+!data/ALINCredit/download_data.py
