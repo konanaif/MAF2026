@@ -28,3 +28,6 @@ result/
 algorithms/inprocessing/DMLBG/logs/
 data/ALINCredit/*
 !data/ALINCredit/download_data.py
+data/ALINMed/*
+!data/ALINMed/download_nih_subset.py
+!data/ALINMed/four_findings_expert_labels_*.csv
