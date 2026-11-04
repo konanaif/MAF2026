@@ -51,3 +51,5 @@ data/ALINCredit/*
 data/ALINMed/*
 !data/ALINMed/download_nih_subset.py
 !data/ALINMed/four_findings_expert_labels_*.csv
+data/kobroadcast/
+

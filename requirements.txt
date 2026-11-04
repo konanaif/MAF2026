@@ -119,3 +119,9 @@ lightgbm==4.6.0
 xlrd==2.0.2
 pyarrow==22.0.0
 ucimlrepo==0.0.7
+soxr==0.3.0
+pytorch-metric-learning==2.0.0
+faiss-cpu==1.8.0
+
+peft==0.17.1
+concept-erasure @ git+https://github.com/EleutherAI/concept-erasure.git@9f51753821316a1edacf78b52b464ab26d40e60a
