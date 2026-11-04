@@ -27,3 +27,4 @@ from MAF.algorithms.inprocessing.deemc.DEEMC import DEEMC
 
 from MAF.algorithms.inprocessing.alincredit import ALINCredit
 from MAF.algorithms.inprocessing.draf import DRAF
+from MAF.algorithms.inprocessing.kobroadcast.KoBroadcast import KoBroadcast
