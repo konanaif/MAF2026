@@ -1,0 +1,83 @@
+{
+  "algorithm": "DEE-MC",
+  "baseline": "mf_reference",
+  "classification_threshold": 3.0,
+  "threads": 8,
+  "criteria": {
+    "test_rmse_lt": 0.82,
+    "dee_lt": 0.05
+  },
+  "inference": {
+    "dataset": "ML-1M",
+    "glocal_checkpoints": [
+      "model_001.pt",
+      "model_002.pt"
+    ],
+    "mf_checkpoint": "mf_model.pt",
+    "split_artifact": "split_indices.npz",
+    "split_manifest": "split_manifest.json",
+    "split_seed": 1234,
+    "test_fraction": 0.1,
+    "index_order": "ascending original user ID and ascending original movie ID; matrix rows=movies, columns=users",
+    "ensemble_dtype": "float64 average then float32, matching original",
+    "blend_dtype": "float64 weighted sum then float32, matching original",
+    "blend_weight": 0.15,
+    "clip_min": 1.0,
+    "clip_max": 5.0,
+    "dee_threshold": 3.0,
+    "mf_training": {
+      "k": 32,
+      "reg": 0.08,
+      "epochs": 50,
+      "lr": 0.02,
+      "seed": 0,
+      "optimizer": "torch.optim.Adam (default betas/eps/weight_decay)",
+      "batch": "full observed training matrix, np.nonzero row-major order",
+      "initialization": "item factors then user factors; torch.randn(generator seed=0)*0.1; zero biases",
+      "global_mean": "float32 mean of observed train ratings; held fixed",
+      "loss": "observed MSE + reg * (mean item factor squared norms + mean user factor squared norms + mean item bias squares + mean user bias squares)",
+      "device": "cpu"
+    },
+    "swa": {
+      "start": 5,
+      "basis": "weights",
+      "weights_already_averaged": true
+    },
+    "lambda_dee": 0.5
+  },
+  "training": {
+    "dataset": "ML-1M",
+    "frac": 0.1,
+    "seed": 1234,
+    "torch_seed": 0,
+    "num_models": 2,
+    "ensemble_basis": "last",
+    "initial_seeds": [
+      0,
+      1
+    ],
+    "optimizer": "lbfgs",
+    "lr": 1.0,
+    "lambda_dee": 0.5,
+    "dee_threshold": 3.0,
+    "map_threshold": 4.0,
+    "dee_bandwidth": 0.01,
+    "dee_huber_delta": 0.01,
+    "hyperparameters": {
+      "n_hid": 700,
+      "n_dim": 5,
+      "n_layers": 2,
+      "gk_size": 5,
+      "lambda_2": 80.0,
+      "lambda_s": 0.018,
+      "iter_p": 50,
+      "iter_f": 10,
+      "epoch_p": 20,
+      "epoch_f": 30,
+      "dot_scale": 0.5,
+      "history_size": 10,
+      "normalize": "none",
+      "pooling": "average"
+    }
+  }
+}
