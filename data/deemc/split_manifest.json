@@ -1,0 +1,23 @@
+{
+  "seed": 1234,
+  "test_fraction": 0.1,
+  "ratings": 1000209,
+  "users": 6040,
+  "movies": 3706,
+  "train_observed": 900189,
+  "test_observed": 100020,
+  "matrix_orientation": "rows=movie_ids; columns=user_ids; both sorted ascending",
+  "split_rule": "first int(frac*n) indices of np.random.seed(seed); np.arange(n); np.random.shuffle(idx) are test",
+  "artifact_sha256": "d1e2a6048c115209da982d5b8f66438de3af22fc4b19e150e3e0fb5d7256a078",
+  "data_sha256": {
+    "movielens_1m_dataset.dat": "506d64ca44484487c11dc2d9a28de5c54948213e6b96285e298afe28d6ea4e0f",
+    "users.dat": "1dc3a95300cb19f7c10e027daf29b8cdf1d908dab65b5edfb45950aa389a10a3",
+    "movies.dat": "0140fc2356357c1a851d0f52e893a1e4d3696df632c4141cea8d5bc3d621f0b9"
+  },
+  "matrix_sha256": {
+    "train_r": "078ddd073374a00c0a7c89852f23bfb79ae7f6577c5c72037e3eeac2317cdf27",
+    "train_m": "ab882ca96743278d007003df2d06d003a658d0006f34cdb8d83bad916f47ce1f",
+    "test_r": "247030ad5c5bac3a1a373526ad0c065c856a819c5e9c82c75f0ecba3475308b0",
+    "test_m": "2cb992bf1b18508b9fa2447d3ad1c9b7a850164496b3007622bbb9bbc572ef24"
+  }
+}

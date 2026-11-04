@@ -23,5 +23,7 @@ from MAF.algorithms.inprocessing.gerry_fair_classifier import GerryFairClassifie
 from MAF.algorithms.inprocessing.grid_search_reduction import GridSearchReduction
 from MAF.algorithms.inprocessing.dmlbg import *
 from MAF.algorithms.inprocessing.fairasr import *
+from MAF.algorithms.inprocessing.deemc.DEEMC import DEEMC
+
 from MAF.algorithms.inprocessing.alincredit import ALINCredit
 from MAF.algorithms.inprocessing.draf import DRAF

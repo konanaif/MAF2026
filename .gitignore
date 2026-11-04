@@ -26,6 +26,26 @@ data/RH
 test_framework.py
 result/
 algorithms/inprocessing/DMLBG/logs/
+data/deemc/*
+!data/deemc/split_indices.npz
+!data/deemc/split_manifest.json
+
+# 테스트 코드는 커밋하지 않는다
+tests/
+test_*.py
+
+# README는 루트와 MAF2026-DEMO만 커밋한다
+**/README.md
+!/README.md
+!/MAF2026-DEMO/README.md
+
+# Claude 관련 파일은 커밋하지 않는다
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.claude.local.md
+CLAUDE-SECURITY/
+.superpowers/
 data/ALINCredit/*
 !data/ALINCredit/download_data.py
 data/ALINMed/*
