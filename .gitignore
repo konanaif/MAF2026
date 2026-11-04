@@ -46,3 +46,8 @@ CLAUDE.local.md
 .claude.local.md
 CLAUDE-SECURITY/
 .superpowers/
+data/ALINCredit/*
+!data/ALINCredit/download_data.py
+data/ALINMed/*
+!data/ALINMed/download_nih_subset.py
+!data/ALINMed/four_findings_expert_labels_*.csv
