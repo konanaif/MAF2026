@@ -1,6 +1,4 @@
 """HF mrm8488/ImageNet1K-val parquet → torchvision ImageNet 레이아웃(<dst>/meta.bin, <dst>/val/<wnid>/*.JPEG).
-
-제출분 D의 sample.ImageNetDataset(torchvision.datasets.ImageNet)이 요구하는 형식.
 meta.bin = (wnid_to_classes, val_wnids): val_wnids는 val 파일명 정렬 순서와 맞춘다.
 사용: python imagenet_from_parquet.py --src <parquet 폴더> --dst <root>
 """
