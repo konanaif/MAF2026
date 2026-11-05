@@ -53,3 +53,4 @@ data/ALINMed/*
 !data/ALINMed/four_findings_expert_labels_*.csv
 data/kobroadcast/
 
+data/casual_path_tracing/
