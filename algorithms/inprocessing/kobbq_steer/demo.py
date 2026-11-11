@@ -20,6 +20,15 @@ __all__ = ["compare_sample", "main"]
 
 # GPU 한 장에 7B 모델을 동시에 두 번 올리지 않도록 호출을 직렬화한다
 _LOCK = threading.Lock()
+# 웹에서 들어오는 입력이 7B forward 를 임의 길이로 키우지 못하게 모델 로드 전에 자른다(KoBBQ 문항은 수백 자)
+MAX_CHARS = {"context": 1000, "question": 300, "choice": 100}
+
+
+def _check_length(value, kind, name):
+    if len(value) > MAX_CHARS[kind]:
+        raise ValueError(
+            f"{name} is too long ({len(value)} chars; max {MAX_CHARS[kind]})"
+        )
 
 
 def _index_of(value, options, name):
@@ -51,6 +60,10 @@ def compare_sample(
     options = [str(c).strip() for c in choices]
     if len(options) != 3 or not all(options):
         raise ValueError(f"choices must be exactly 3 non-empty strings: {choices!r}")
+    _check_length(context, "context", "context")
+    _check_length(question, "question", "question")
+    for i, o in enumerate(options):
+        _check_length(o, "choice", f"choice {i + 1}")
     answer_idx = _index_of(answer, options, "answer")
     biased_idx = _index_of(biased_answer, options, "biased_answer")
 
@@ -81,9 +94,8 @@ def compare_sample(
         )
         if not hf_dir.exists():
             raise FileNotFoundError(
-                f"{hf_dir}: HF model cache not found. Mount "
-                "/data/nayoung.han/models/maf2026 or pass --model-dir "
-                "(see algorithms/inprocessing/kobbq_steer/README.md)"
+                f"{hf_dir}: HF model cache not found. Mount the model directory "
+                "or pass --model-dir (see algorithms/inprocessing/kobbq_steer/README.md)"
             )
         model, tok = load_model(cfg, device)
         try:
