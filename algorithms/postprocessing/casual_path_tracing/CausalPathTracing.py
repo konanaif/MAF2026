@@ -11,7 +11,7 @@ import tqdm
 import torch
 import numpy as np
 from .util.cpt_language_function import (
-    arg_func, build_arg_list, set_utils, get_model, get_noise_level, make_inputs,
+    arg_func, build_arg_list, set_utils, get_model, get_noise_level, make_inputs, decode_tokens,
     predict_from_normal_and_noise_input, CausalFlowTracer, top_down_causal_flow_trace,
     aggregate_paths, get_num_path_node, path_forward
 )
@@ -205,6 +205,28 @@ class CausalPathTracing:
     def compute_metrics(self, eval_results):
         return common_utils.compute_metrics(eval_results)
 
+    def predict_answer(self, li):
+        """원래 모델의 다음 토큰 1개와 정답(attribute) 포함 여부 — correct check(out_num=1)와 같은 기준."""
+        statement = self.line_data[li]
+        inp = make_inputs(self.mt.tokenizer, [statement["prompt"]] * self.args.num_noise_sample)
+        token = CausalFlowTracer(self.args).trace_normal(self.mt.model, inp)
+        prediction = decode_tokens(self.mt.tokenizer, token)[0]
+        return prediction, statement["attribute"] in prediction
+
+    def sample_report(self, li):
+        """DEMO용 샘플 1건 요약: 프롬프트·정답·모델 답·정답 여부와, 추적됐으면 경로 지표·경로만 남긴 답."""
+        statement = self.line_data[li]
+        prediction, correct = self.predict_answer(li)
+        report = {"index": li, "prompt": statement["prompt"], "answer": statement["attribute"],
+                  "prediction": prediction, "correct": correct, "traced": False,
+                  "path_node_ratio": None, "decision_kept": None, "path_prediction": None}
+        r = getattr(self, "eval_results", {}).get(li)
+        if r is not None:
+            report.update(traced=True, path_node_ratio=r["num_selected_node"] / r["num_total_node"],
+                          decision_kept=r["org_decision"] == r["path_decision"],
+                          path_prediction=self.mt.tokenizer.decode([r["path_decision"]]))
+        return report
+
     def run(self):
         baseline_results = self.baseline_fit()
 
@@ -228,18 +250,32 @@ class CausalPathTracing:
         return metrics_orig, metrics_causal_path
 
 
-def mitigate_cpt():
-    """MAF-DEMO용: 기본 호출(샘플 16·204)로 인과 경로만 남겼을 때의 두 지표를 돌려준다.
+DEFAULT_CPT_SAMPLES = (16, 204)
+MAX_CPT_SAMPLES = 5  # 샘플당 약 9초(pythia-14m, GPU) — 웹 요청 한 번에 묶을 상한
+
+
+def mitigate_cpt(sample_indices=None):
+    """MAF-DEMO용: known_1000 샘플(기본 16·204)에 인과 경로만 남겼을 때의 두 지표를 돌려준다.
 
     장기 프로세스(DEMO)에서 불리므로 run()이 바꾼 grad 모드와 root logger 핸들러를 되돌린다.
+    반환: path_node_ratio, decision_kept_ratio, num_samples, samples(실제로 추적된 인덱스), details(요청 샘플별 요약).
     """
+    indices = sorted(set(DEFAULT_CPT_SAMPLES if sample_indices is None else sample_indices))
+    if not indices or len(indices) != len(list(sample_indices or DEFAULT_CPT_SAMPLES)):
+        raise ValueError(f"sample_indices must be 1..{MAX_CPT_SAMPLES} distinct integers: {sample_indices!r}")
+    if any(type(i) is not int or i < 0 for i in indices) or len(indices) > MAX_CPT_SAMPLES:
+        raise ValueError(f"sample_indices must be 1..{MAX_CPT_SAMPLES} distinct integers >= 0: {sample_indices!r}")
     root_logger = logging.getLogger()
     handlers_before = list(root_logger.handlers)
     grad_before = torch.is_grad_enabled()
     try:
         cpt = CausalPathTracing(dataset_name='known1000', model='pythia-14m', gpu='0',
-                                target_sample_index_list='16, 204')
+                                target_sample_index_list=", ".join(str(i) for i in indices))
+        if not cpt.target_ids:
+            raise ValueError(f"no known_1000 sample matched {indices}; indices must be 0..{len(cpt.line_data) - 1}")
         _, metrics_causal_path = cpt.run()
+        samples = sorted(int(k) for k in cpt.eval_results)
+        details = [cpt.sample_report(li) for li in indices if li in cpt.target_ids]
     finally:
         torch.set_grad_enabled(grad_before)
         for handler in list(root_logger.handlers):
@@ -247,7 +283,8 @@ def mitigate_cpt():
                 root_logger.removeHandler(handler)
                 handler.close()
     return {"path_node_ratio": metrics_causal_path["path_node_ratio"],
-            "decision_kept_ratio": metrics_causal_path["decision_kept_ratio"]}
+            "decision_kept_ratio": metrics_causal_path["decision_kept_ratio"],
+            "num_samples": len(samples), "samples": samples, "details": details}
 
 
 def main(argv=None):
