@@ -6,6 +6,7 @@ import csv
 from datetime import datetime, timezone
 from importlib.metadata import version
 import json
+import logging
 from pathlib import Path
 import platform
 from time import perf_counter
@@ -17,9 +18,14 @@ from . import runtime
 from .integrity import sha256, verify_original
 from .maf_metrics import compute_metrics, prediction_dataset, to_aif360_dataset
 
+log = logging.getLogger(__name__)
 MAF_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATA_DIR = MAF_ROOT / "data" / "deemc"
 DEFAULT_MODEL_DIR = MAF_ROOT / "model" / "deemc"
+# λ_dee=0 ablation arm(데모 비교용): 제출 체크포인트와 lambda_dee 만 다른 GLocal-K 2개, model_dir 상대경로.
+# 있을 때만 arm "glocal_lambda0" 을 더한다. 원본 config.json·SHA256SUMS 는 건드리지 않고 해시 검증도 하지 않는다
+LAMBDA0_CHECKPOINTS = ("lambda0/model_001.pt", "lambda0/model_002.pt")
+LAMBDA0_LAMBDA_DEE = 0.0
 
 
 def json_safe(value):
@@ -80,6 +86,26 @@ class DEEMCRunner:
         self.report = None
         self.dataset_orig_test = None
 
+    def lambda0_available(self):
+        return all((self.model_dir / name).is_file() for name in LAMBDA0_CHECKPOINTS)
+
+    def arm_names(self):
+        return ["mf_reference", *(["glocal_lambda0"] if self.lambda0_available() else []), "dee_mc"]
+
+    def _lambda0_predictions(self, tr, tm, n_m, n_u):
+        """λ_dee=0 체크포인트 2개의 예측과 로드 기록(학습 설정·strict load·유한값 검사, 해시 없음)."""
+        expected = runtime.lambda0_training_config(self.config["training"], LAMBDA0_LAMBDA_DEE)
+        predictions, loads = [], []
+        for relative in LAMBDA0_CHECKPOINTS:
+            try:
+                model, check = runtime.load_glocal(self.model_dir / relative, expected, n_m, n_u, self.device)
+            except Exception as e:  # 해시 검증이 없으므로(D-76) 깨진/다른 파일은 여기서 파일명과 함께 드러낸다
+                raise ValueError(f"lambda0 checkpoint {relative}: {type(e).__name__}: {e}") from e
+            predictions.append(runtime.glocal_predict(model, tr, tm))
+            loads.append(check)
+            del model
+        return predictions, loads
+
     def _aif_test(self, inputs):
         _, _, test_r, test_m, user_ids, movie_ids, groups = inputs
         mi, ui = np.nonzero(test_m)
@@ -135,14 +161,24 @@ class DEEMCRunner:
             del model
         if len(predictions) != 2:
             raise ValueError("The supplied final model requires exactly two GLocal-K checkpoints")
+        ablation_present = self.lambda0_available()
+        if ablation_present:
+            lambda0_predictions, lambda0_loads = self._lambda0_predictions(tr, tm, len(movie_ids), len(user_ids))
+        else:
+            lambda0_predictions, lambda0_loads = None, []
+            log.warning("lambda0 checkpoints missing; ablation arm skipped")
         mf, mf_origin = runtime.mf_predict(self.model_dir / config["mf_checkpoint"],
                                          user_ids, movie_ids, config, self.device)
         final = runtime.blend(predictions, mf, config["blend_weight"])
-        del predictions, tr, tm
+        arms = [("mf_reference", mf)]
+        if ablation_present:
+            arms.append(("glocal_lambda0", runtime.blend(lambda0_predictions, mf, config["blend_weight"])))
+        arms.append(("dee_mc", final))
+        del predictions, lambda0_predictions, tr, tm
         self.dataset_orig_test, mi, ui = self._aif_test(inputs)
         result = {}
         native = {}
-        for name, scores in (("mf_reference", mf), ("dee_mc", final)):
+        for name, scores in arms:
             native_metrics, details = runtime.metrics(scores, inputs, config["dee_threshold"])
             pred = prediction_dataset(self.dataset_orig_test, np.clip(scores[mi, ui], 1, 5), self.threshold)
             result[name] = self.compute_metrics(pred)
@@ -157,8 +193,12 @@ class DEEMCRunner:
             "algorithm": "DEE-MC", "evaluated_utc": datetime.now(timezone.utc).isoformat(),
             "comparison": {"baseline": "MF reference (no fairness regularization)",
                            "final": "DEE-regularized GLocal-K SWA ensemble + 15% MF",
-                           "matched_dee_ablation": False,
-                           "interpretation": "Different backbones; differences are not attributable solely to DEE."},
+                           "matched_dee_ablation": ablation_present,
+                           "interpretation": ("glocal_lambda0 vs dee_mc share backbone, seeds and MF blend and differ only in lambda_dee; "
+                                              "mf_reference remains a different backbone." if ablation_present else
+                                              "Different backbones; differences are not attributable solely to DEE.")},
+            "ablation": {"present": ablation_present, "lambda_dee": LAMBDA0_LAMBDA_DEE,
+                         "checkpoints": [{"path": c["path"], "sha256": c["sha256"]} for c in lambda0_loads]},
             "formula": "0.85 * mean(GLocal-K_1, GLocal-K_2) + 0.15 * MF; original float64 accumulation/float32 boundaries; final clip [1,5]",
             "config": self.config,
             "native": native, "maf": result,
@@ -192,10 +232,10 @@ class DEEMCRunner:
         (output / "report.json").write_text(json.dumps(json_safe(self.report), indent=2, allow_nan=False) + "\n")
         with (output / "metrics.csv").open("w", newline="") as stream:
             writer = csv.writer(stream)
-            writer.writerow(["metric_family", "metric", "mf_reference", "dee_mc"])
+            arms = [a for a in ("mf_reference", "glocal_lambda0", "dee_mc") if a in self.report["maf"]]
+            writer.writerow(["metric_family", "metric", *arms])
             for key in self.report["maf"]["mf_reference"]:
-                writer.writerow(["maf", key, self.report["maf"]["mf_reference"][key], self.report["maf"]["dee_mc"][key]])
+                writer.writerow(["maf", key, *(self.report["maf"][a][key] for a in arms)])
             for key in self.report["native"]["mf_reference"]["metrics"]:
-                writer.writerow(["native", key, self.report["native"]["mf_reference"]["metrics"][key],
-                                 self.report["native"]["dee_mc"]["metrics"][key]])
+                writer.writerow(["native", key, *(self.report["native"][a]["metrics"][key] for a in arms)])
         return output / "report.json"
