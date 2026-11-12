@@ -52,12 +52,6 @@ class DRAF:
         self.dataset_orig = dataset.copy(deepcopy=True)
         self.label_policy_ = "dataset favorable_label metadata"
         self.data_warnings_ = []
-        if loaded_builtin and dataset_name == "german":
-            # Keep the same labels/metadata as other MAF algorithms. The upstream
-            # inconsistency must be fixed framework-wide, not in this adapter.
-            self.data_warnings_.append(dict(code="MAF_GERMAN_LABEL_SEMANTICS",
-                message="MAF 173d51d marks raw bad credit as favorable after credit-1. "
-                        "Unchanged for cross-algorithm compatibility."))
         self.sensitive_attributes = list(dataset.protected_attribute_names if sensitive_attributes is None
                                          else sensitive_attributes)
         if (not self.sensitive_attributes or len(set(self.sensitive_attributes)) != len(self.sensitive_attributes)
