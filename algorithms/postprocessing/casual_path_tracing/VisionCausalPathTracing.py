@@ -5,6 +5,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 import copy
 import json
+import logging
 import random
 import torch
 import numpy as np
@@ -14,7 +15,7 @@ from .util.cpt_vision_function import (
     predict_from_normal_and_noise_input, CausalFlowTracer, top_down_causal_flow_trace,
     aggregate_paths, get_num_path_node, path_forward
 )
-from MAF.datamodule.casual_path_tracing.sample import ImageNetDataset, IMAGENET_ROOT
+from MAF.datamodule.casual_path_tracing.sample import ImageNetDataset, IMAGENET_ROOT, MAF_ROOT
 from MAF.metric.casual_path_tracing import get_metric as common_utils
 
 class VisionCausalPathTracing:
@@ -176,6 +177,38 @@ class VisionCausalPathTracing:
     def compute_metrics(self, eval_results):
         return common_utils.compute_metrics(eval_results)
 
+    def class_info(self, class_idx):
+        """ImageNet-1k 클래스 인덱스 → (wnid, 사람이 읽는 이름); timm 메타데이터(오프라인) 사용."""
+        from timm.data import ImageNetInfo
+        info = ImageNetInfo()
+        return info.index_to_label_name(class_idx), info.index_to_description(class_idx)
+
+    def predict_sample(self, sample_idx):
+        """원래 모델의 top-1 클래스와 라벨 일치 여부 — cpt_fit 의 correct check(out_num=1)와 같은 기준."""
+        images, labels = self.load_sample(sample_idx)
+        inp = {"pixel_values": images.repeat(self.args.num_noise_sample, 1, 1, 1)}
+        with torch.no_grad():
+            answer = CausalFlowTracer().trace_normal(self.mt.model, inp, self.args.model)
+        pred = int(answer.reshape(-1)[0].item())
+        label = int(labels[0].item())
+        label_wnid, label_name = self.class_info(label)
+        pred_wnid, pred_name = self.class_info(pred)
+        return {"index": sample_idx, "label": label, "label_wnid": label_wnid, "label_name": label_name,
+                "prediction": pred, "prediction_wnid": pred_wnid, "prediction_name": pred_name,
+                "correct": pred == label}
+
+    def sample_report(self, sample_idx):
+        """DEMO용 샘플 1건 요약: 예측·라벨과, 추적됐으면 경로 지표·경로만 남긴 클래스."""
+        report = dict(self.predict_sample(sample_idx), traced=False, path_node_ratio=None,
+                      decision_kept=None, path_prediction=None, path_prediction_name=None)
+        r = getattr(self, "eval_results", {}).get(sample_idx)
+        if r is not None:
+            _, path_name = self.class_info(int(r["path_decision"]))
+            report.update(traced=True, path_node_ratio=r["num_selected_node"] / r["num_total_node"],
+                          decision_kept=r["org_decision"] == r["path_decision"],
+                          path_prediction=int(r["path_decision"]), path_prediction_name=path_name)
+        return report
+
     def run(self):
         baseline_results = self.baseline_fit()
 
@@ -194,6 +227,59 @@ class VisionCausalPathTracing:
         metrics_causal_path = self.compute_metrics(self.eval_results)
         self.save_eval_results(self.eval_results, metrics_orig, metrics_causal_path)
         return metrics_orig, metrics_causal_path
+
+
+DEFAULT_VISION_SAMPLE = 5050
+IMAGENET_VAL_SIZE = 50000
+_PREDICT_SAVE_ROOT = os.path.join(str(MAF_ROOT), "result", "casual_path_tracing", "predict")
+
+
+def _check_index(sample_idx):
+    if type(sample_idx) is not int or not 0 <= sample_idx < IMAGENET_VAL_SIZE:
+        raise ValueError(f"sample_idx must be an integer in 0..{IMAGENET_VAL_SIZE - 1}: {sample_idx!r}")
+
+
+def _restoring_process_state(fn):
+    """DEMO 같은 장기 프로세스에서 불리므로 grad 모드와 root logger 핸들러를 되돌린다."""
+    root_logger = logging.getLogger()
+    handlers_before = list(root_logger.handlers)
+    grad_before = torch.is_grad_enabled()
+    try:
+        return fn()
+    finally:
+        torch.set_grad_enabled(grad_before)
+        for handler in list(root_logger.handlers):
+            if handler not in handlers_before:
+                root_logger.removeHandler(handler)
+                handler.close()
+
+
+def predict_vision_cpt(sample_idx):
+    """MAF-DEMO용(수 초): ImageNet val 샘플 1개의 top-1 예측·라벨·정답 여부. 결과 디렉터리는 predict_* 로 분리."""
+    _check_index(sample_idx)
+
+    def _run():
+        cpt = VisionCausalPathTracing(dataset_name='imagenet', model='vit_tiny_patch16_224', gpu='0',
+                                      target_sample_idx=sample_idx, save_root=_PREDICT_SAVE_ROOT)
+        return cpt.predict_sample(sample_idx)
+    return _restoring_process_state(_run)
+
+
+def trace_vision_cpt(sample_idx):
+    """MAF-DEMO용(약 15분): 샘플 1개 인과 경로 추적 + 평가. 결과는 run_* 디렉터리에 저장된다."""
+    _check_index(sample_idx)
+
+    def _run():
+        cpt = VisionCausalPathTracing(dataset_name='imagenet', model='vit_tiny_patch16_224', gpu='0',
+                                      target_sample_idx=sample_idx)
+        _, metrics_causal_path = cpt.run()
+        samples = sorted(int(k) for k in cpt.eval_results)
+        return {"path_node_ratio": metrics_causal_path["path_node_ratio"],
+                "decision_kept_ratio": metrics_causal_path["decision_kept_ratio"],
+                "num_samples": len(samples), "samples": samples,
+                "run": os.path.basename(os.path.normpath(cpt.args.save_root)),
+                "details": [cpt.sample_report(sample_idx)]}
+    return _restoring_process_state(_run)
 
 
 def main(argv=None):
