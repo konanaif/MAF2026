@@ -77,6 +77,13 @@ def load_inputs(config, data_dir):
 ENVIRONMENT_KEYS = {"data_path", "run_dir", "device"}
 
 
+def lambda0_training_config(training, lambda_dee):
+    """ablation 체크포인트 검사용: config.json training 에서 lambda_dee 만 바꾼 사본."""
+    expected = json.loads(json.dumps(training))
+    expected["lambda_dee"] = lambda_dee
+    return expected
+
+
 def check_training_config(saved, expected):
     """체크포인트의 학습 설정이 config.json 의 training 과 같은지(환경 키 제외) 확인."""
     saved = {k: v for k, v in saved.items() if k not in ENVIRONMENT_KEYS}
