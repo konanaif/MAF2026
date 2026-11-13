@@ -55,3 +55,5 @@ data/kobroadcast/
 
 data/casual_path_tracing/
 data/kobbq_steer/
+data/utkface/
+!algorithms/inprocessing/rg_tta_function/configs/prompt_templates.csv
