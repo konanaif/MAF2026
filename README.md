@@ -27,7 +27,6 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Learning Fair Representation
   * Reweighing
   * Optim Preproc
-  * Learning Fair Representation
 * SOTA Algorithm
   * Co-occurrence-bias [📃paper](https://aclanthology.org/2023.findings-emnlp.518.pdf) [💻 code](https://github.com/CheongWoong/impact_of_cooccurrence)
   * Fair Streaming PCA [📃paper](https://arxiv.org/abs/2310.18593) [💻 code](https://github.com/HanseulJo/fair-streaming-pca/?tab=readme-ov-file)
@@ -149,8 +148,8 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
      - Public Figures Face Database [📚 data](https://www.cs.columbia.edu/CAVE/databases/pubfig/download/)
      - CelebA [📚 data](https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
        - 해당 데이터는 datamodule/dataset.py - CelebADataset를 통해 로드됩니다. 시스템 메모리에 따라 CelebADataset 클래스 내 dask.dataframe.from_pandas() 함수의 npartitions 변수값 조정이 필요할 수 있습니다. (https://docs.dask.org/en/stable/generated/dask.dataframe.from_pandas.html?highlight=from_pandas#dask.dataframe.from_pandas)
-       - NIH ChestX-ray14 [📚 data](https://huggingface.co/datasets/alkzar90/NIH-Chest-X-ray-dataset)
-       - UTKFace [📚 data](https://susanqq.github.io/UTKFace/)
+     - NIH ChestX-ray14 [📚 data](https://huggingface.co/datasets/alkzar90/NIH-Chest-X-ray-dataset)
+     - UTKFace [📚 data](https://susanqq.github.io/UTKFace/)
 
    - text
      - KoBBQ [📚 data](https://github.com/naver-ai/KoBBQ/tree/main)
