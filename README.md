@@ -27,12 +27,12 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Learning Fair Representation
   * Reweighing
   * Optim Preproc
-  * Learning Fair Representation
 * SOTA Algorithm
   * Co-occurrence-bias [📃paper](https://aclanthology.org/2023.findings-emnlp.518.pdf) [💻 code](https://github.com/CheongWoong/impact_of_cooccurrence)
   * Fair Streaming PCA [📃paper](https://arxiv.org/abs/2310.18593) [💻 code](https://github.com/HanseulJo/fair-streaming-pca/?tab=readme-ov-file)
   * Representative Heuristic [📚 data](https://github.com/jongwonryu/RH)
   * Fair Batch [📃paper](https://arxiv.org/abs/2012.01696) [💻 code](https://github.com/yuji-roh/fairbatch)
+  * ALINMed [💻 code](https://github.com/HEMMO0208/ALINMed-MAF)
 
 ### In-processing Algorithms
 * AIF360
@@ -54,9 +54,9 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Kernel Density Estimator [📃paper](https://proceedings.neurips.cc/paper/2020/hash/ac3870fcad1cfc367825cda0101eee62-Abstract.html) [💻 code](https://github.com/Gyeongjo/FairClassifier_using_KDE)
   * DMLBG
   * FairASR [📃paper](https://arxiv.org/abs/2506.10747) [💻 code](https://github.com/JongSuk1/FairASR)
-  * DEE-MC (Equal-Experience regularized matrix completion, MovieLens-1M) [📃paper](https://arxiv.org/abs/2210.05936)
-  * SAE (Base / Base+SWA / FairBatch / LEACE+SWA, 한국어 방송 문장 유해성 분류; 데이터는 `data/sae/`에 train/dev/test.jsonl 을 직접 두고, 모델은 실행 시 `model/sae/hf`로 자동 다운로드)
-  * KoBBQ-Steer (AlphaSteer null-space 활성화 스티어링으로 KoBBQ 편향 완화, Qwen2.5-7B-Instruct; `run()` → (base, alphasteer) KoBBQ test 지표, `--kmmlu` 로 KMMLU test 추가. 데이터는 `data/kobbq_steer/{ext/KoBBQ, raw/}` 를 직접 준비(패키지 README 절차), 모델은 `model/kobbq_steer/hf` 로 자동 수신, 스티어링 행렬은 없으면 첫 실행이 생성(GPU 약 1시간)) [📃paper](https://arxiv.org/abs/2506.07022)
+  * ALINCredit [💻 code](https://github.com/jhoonjwa/ALINCredit)
+  * DRAF [📃paper](https://arxiv.org/abs/2510.21091) [💻 code](https://github.com/subgroup-fair/draf)
+  * RG-TTA
 
 ### Post-processing Algorithms
 * AIF360
@@ -139,11 +139,17 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
      - COMPAS [📚 data](https://github.com/propublica/compas-analysis/)
      - German credit scoring [📚 data](https://archive.ics.uci.edu/dataset/144/statlog+german+credit+data)
      - Adult Census Income [📚 data](https://archive.ics.uci.edu/dataset/2/adult)
+     - Credit Union (ALINCredit): 공개 신용 데이터셋 8종을 하나의 합집합 피처 공간으로 통합
+       - [📚 German Credit](https://archive.ics.uci.edu/dataset/144/statlog+german+credit+data), [📚 Taiwan Credit Card Default](https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients), [📚 Credit Approval](https://archive.ics.uci.edu/dataset/27/credit+approval), [📚 Australian Credit](https://archive.ics.uci.edu/dataset/143/statlog+australian+credit+approval)
+       - [📚 LendingClub 2007–2011](https://github.com/jhoonjwa/ALINCredit/blob/main/data/lendingclub.csv), [📚 Prosper Loans](https://s3.amazonaws.com/udacity-hosted-downloads/ud651/prosperLoanData.csv), [📚 Home Credit Default Risk](https://huggingface.co/datasets/mohameddhameem/home-credit-default-risk), [📚 HMEQ](http://www.creditriskanalytics.net/uploads/1/9/5/1/19511601/hmeq.csv)
+       - `data/ALINCredit/download_data.py`로 받을 수 있으며, 각 데이터셋은 원 출처의 라이선스·이용 약관을 따릅니다.
 
    - image
      - Public Figures Face Database [📚 data](https://www.cs.columbia.edu/CAVE/databases/pubfig/download/)
      - CelebA [📚 data](https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
        - 해당 데이터는 datamodule/dataset.py - CelebADataset를 통해 로드됩니다. 시스템 메모리에 따라 CelebADataset 클래스 내 dask.dataframe.from_pandas() 함수의 npartitions 변수값 조정이 필요할 수 있습니다. (https://docs.dask.org/en/stable/generated/dask.dataframe.from_pandas.html?highlight=from_pandas#dask.dataframe.from_pandas)
+     - NIH ChestX-ray14 [📚 data](https://huggingface.co/datasets/alkzar90/NIH-Chest-X-ray-dataset)
+     - UTKFace [📚 data](https://susanqq.github.io/UTKFace/)
 
    - text
      - KoBBQ [📚 data](https://github.com/naver-ai/KoBBQ/tree/main)
@@ -181,6 +187,22 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴadult.data
                 ㄴadult.names
                 ㄴadult.test
+              ㄴALINCredit
+                ㄴdownload_data.py #Credit Union 데이터 및 AIF360 원본 파일 설치
+                ㄴaustralian.csv
+                ㄴcreditapproval.csv
+                ㄴdefault of credit card clients.xls
+                ㄴgerman.data
+                ㄴhmeq.csv
+                ㄴhomecredit_application_train.parquet
+                ㄴlendingclub.csv
+                ㄴprosperLoanData.csv
+              ㄴALINMed
+                ㄴdownload_nih_subset.py
+                ㄴfour_findings_expert_labels_test_labels.csv
+                ㄴfour_findings_expert_labels_validation_labels.csv
+                ㄴdatasets
+                  ㄴnih-chest-xrays/data/versions/3/images_001 ~ images_012
               ㄴceleba
                 ㄴimg_align_celeba
                 ㄴlist_attr_celeba.csv
@@ -233,14 +255,24 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴpubfig_attributes.txt
               ㄴRH
                 ㄴRH_dataset.xlsx
-              ㄴcasual_path_tracing # known_1000.json 자동 수신, imagenet/ 은 직접 준비
-              ㄴkobbq_steer # ext/KoBBQ·raw/ 직접 준비, processed/ 자동 생성
+              ㄴcasual_path_tracing
+                ㄴlama_trex.json
+              ㄴutkface
+                  ㄴgender/utkface
+                    ㄴtest/ViT-B-16.pt
+                    ㄴtest/ViT-L-14.pt
+                    ㄴtrain/ViT-B-16.pt
+                  ㄴrace/utkface
+                    ㄴtest/ViT-B-16.pt
+                    ㄴtest/ViT-L-14.pt
+                    ㄴtrain/ViT-B-16.pt
               ㄴember # 원본 repo를 통해 full data 다운로드 필수
                 ㄴif
                   ㄴember_if.json
                 ㄴqa
                   ㄴember_qa_gpt4.json
                   ㄴember_qa_newbing.json
+              
          ```
 
         4-2. model

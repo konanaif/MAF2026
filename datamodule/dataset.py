@@ -495,7 +495,7 @@ class GermanDataset(StandardDataset):
             df = pd.read_csv(
                 filepath, sep=" ", header=None, names=column_names, na_values=na_values
             )
-            df["credit"] = df["credit"] - 1
+            df["credit"] = (df["credit"] == 1).astype(int)
         except IOError as err:
             print("IOError: {}".format(err))
             print("To use this class, please download the following files:")

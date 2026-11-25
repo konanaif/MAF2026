@@ -20,7 +20,7 @@ DEO = |TPR_F - TPR_M| on label 1. favorable label = 1, protected = sex (1 = M, 0
 
 Run
 ---
-  python algorithms/preprocessing/subgroup_balanced_resampling.py                       # rad-DINO, seed 42
+  python algorithms/preprocessing/subgroup_balanced_resampling.py                       # rad-DINO, seed 3
   python algorithms/preprocessing/subgroup_balanced_resampling.py --seed 1              # other seed
   python algorithms/preprocessing/subgroup_balanced_resampling.py --backbone resnet18   # ResNet-18 baseline
 """
@@ -44,7 +44,7 @@ RECIPES = {
 
 class SubgroupBalancedResampling:
     def __init__(self, dataset_name: str = "four_findings", protected: str = "sex",
-                 backbone: str = "raddino", seed: int = 42) -> None:
+                 backbone: str = "raddino", seed: int = 3, nondeterministic: bool = False) -> None:
         if dataset_name != "four_findings":
             raise ValueError(f"Unsupported dataset: {dataset_name}")
         self.dataset_name = dataset_name
@@ -54,6 +54,8 @@ class SubgroupBalancedResampling:
         self.args = target_push.build_argparser().parse_args([])
         self.args.backbone = backbone
         self.args.seed = seed
+        # deterministic mode (default): same seed + same GPU/software -> identical results
+        self.args.nondeterministic = nondeterministic
         for k, v in RECIPES[backbone].items():
             setattr(self.args, k, v)
         self.privileged_groups = [{self.protected: 1}]
@@ -90,10 +92,13 @@ class SubgroupBalancedResampling:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument('--backbone', default='raddino', choices=list(RECIPES))
-    ap.add_argument('--seed', type=int, default=42)
+    ap.add_argument('--seed', type=int, default=3)
+    ap.add_argument('--nondeterministic', action='store_true',
+                    help='turn off the deterministic mode (default on: identical runs for the same seed)')
     a = ap.parse_args()
 
-    sbr = SubgroupBalancedResampling(dataset_name="four_findings", protected="sex", backbone=a.backbone, seed=a.seed)
+    sbr = SubgroupBalancedResampling(dataset_name="four_findings", protected="sex", backbone=a.backbone,
+                                     seed=a.seed, nondeterministic=a.nondeterministic)
     m_orig, m_transf = sbr.run()
     keys = ["accuracy", "Balanced accuracy", "true_positive_rate",
             "equal_opportunity_difference", "average_abs_odds_difference"]
