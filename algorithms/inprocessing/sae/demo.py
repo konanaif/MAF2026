@@ -1,7 +1,4 @@
-"""SAE 데모: 요청마다 합성 예제로 네 기법을 새로 학습·평가해 summary() 를 표용 dict 로 돌려준다.
-
-GPU 전용(CPU 는 약 5분이라 거부). 출력은 result/sae/demo_tmp/ 아래 임시 폴더에 쓰고 읽은 뒤 그
-폴더만 지운다(한 실행이 체크포인트 1.3 GB 를 남기므로; 데모 작업 한정 허용 U3).
+"""SAE 데모: 요청마다 합성 예제로 네 기법을 새로 학습·평가해 summary() 를 dict 로 돌려준다.
 
 실행: python -m MAF.algorithms.inprocessing.sae.demo [--device auto|cuda:N]
 """
