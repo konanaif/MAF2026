@@ -64,7 +64,7 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Equalized Odds
   * Reject Option Classifier
 * SOTA Algorithm
-  * Causal Path Tracing (언어: pythia-14m / known_1000, 비전: timm ViT-tiny / ImageNet-1k val; 지표 `path_node_ratio`·`decision_kept_ratio`. 모델·known_1000·nltk stopwords는 실행 시 `model/casual_path_tracing/`·`data/casual_path_tracing/`로 자동 수신, ImageNet은 `python -m MAF.datamodule.casual_path_tracing.prepare_imagenet`으로 직접 준비) [📃paper](TBA) [💻 code](TBA)
+  * Causal Path Tracing [📃paper](TBA) [💻 code](TBA)
   * EMBER [📃paper](https://arxiv.org/abs/2410.20774) [💻 code](https://github.com/DongryeolLee96/EMBER)
 
 ## Benchmark
