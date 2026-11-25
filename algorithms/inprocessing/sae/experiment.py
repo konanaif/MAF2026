@@ -12,8 +12,8 @@ from torch.optim.swa_utils import SWALR
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 from .runtime import set_random_seed
-from MAF.datamodule.kobroadcast.sample import digest, read_rows, save_predictions, write_json
-from MAF.metric.kobroadcast.get_metric import calibrate, evaluate
+from MAF.datamodule.sae.sample import digest, read_rows, save_predictions, write_json
+from MAF.metric.sae.get_metric import calibrate, evaluate
 from .models import Classifier
 from .preprocess.fairbatch_function import fairbatch_negative_weights
 from .constants import METHODS
@@ -23,7 +23,7 @@ from .preprocess.FairBatch import FairBatch
 from .postprocess.LEACESWA import LEACESWA
 
 MAF_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUTPUT_ROOT = MAF_ROOT / 'result' / 'kobroadcast'
+DEFAULT_OUTPUT_ROOT = MAF_ROOT / 'result' / 'sae'
 METHOD_CLASSES = {'base': Base, 'base_swa': SWA, 'fairbatch': FairBatch, 'leace_swa': LEACESWA}
 
 
@@ -244,7 +244,7 @@ def execute(args, paths, audit, configs):
     # MAF 배치: 패키지 소스 + 분리된 로더·지표 파일. 호스트 전체 requirements.txt는 제외.
     package_root = Path(__file__).resolve().parent
     sources = sorted(p for p in package_root.rglob('*.py') if 'tests' not in p.relative_to(package_root).parts)
-    sources += [package_root / 'prompts/toxicity.md', MAF_ROOT / 'metric/kobroadcast/get_metric.py', MAF_ROOT / 'datamodule/kobroadcast/sample.py']
+    sources += [package_root / 'prompts/toxicity.md', MAF_ROOT / 'metric/sae/get_metric.py', MAF_ROOT / 'datamodule/sae/sample.py']
     source_root = MAF_ROOT
     write_json(output / 'protocol.json', dict(models=list(configs), methods=list(methods), configs=configs, seed=args.seed,
                                              data=audit, class_weight=1., leace_rank=args.leace_rank, leace_strength=args.leace_strength,

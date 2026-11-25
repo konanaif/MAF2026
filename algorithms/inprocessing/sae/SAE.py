@@ -1,36 +1,36 @@
-"""KoBroadcast 진입점: Base / Base+SWA / FairBatch / LEACE+SWA 로 방송 문장 유해성을 분류한다.
+"""SAE 진입점: Base / Base+SWA / FairBatch / LEACE+SWA 로 방송 문장 유해성을 분류한다.
 
-실행: python -m MAF.algorithms.inprocessing.kobroadcast.KoBroadcast [--data-dir DIR] [--model M] [--method X] [--device auto|cpu|cuda:N] [--output DIR]
-데이터는 data/kobroadcast 의 train/dev/test.jsonl (또는 --data-dir). 모델 가중치는 --model-path 가 없으면
-datamodule/kobroadcast/download_data.ensure_model() 이 model/kobroadcast/hf 에 받는다(없을 때만).
+실행: python -m MAF.algorithms.inprocessing.sae.SAE [--data-dir DIR] [--model M] [--method X] [--device auto|cpu|cuda:N] [--output DIR]
+데이터는 data/sae 의 train/dev/test.jsonl (또는 --data-dir). 모델 가중치는 --model-path 가 없으면
+datamodule/sae/download_data.ensure_model() 이 model/sae/hf 에 받는다(없을 때만).
 """
-# ruff: noqa: N999  모듈명 KoBroadcast는 제출분 진입점 이름 유지
+# ruff: noqa: N999  모듈명 SAE 는 다른 진입점(DEEMC·KoBBQSteer)과 같은 대문자 관례
 
 import argparse
 import json
 from pathlib import Path
 
 import torch
-from MAF.algorithms.inprocessing.kobroadcast.constants import (
+from MAF.algorithms.inprocessing.sae.constants import (
     METHODS,
     MODEL_REVISIONS,
     MODELS,
 )
-from MAF.algorithms.inprocessing.kobroadcast.experiment import (
+from MAF.algorithms.inprocessing.sae.experiment import (
     DEFAULT_OUTPUT_ROOT,
     MAF_ROOT,
     execute,
 )
-from MAF.datamodule.kobroadcast.download_data import ensure_model
-from MAF.datamodule.kobroadcast.sample import audit_splits, split_paths
+from MAF.datamodule.sae.download_data import ensure_model
+from MAF.datamodule.sae.sample import audit_splits, split_paths
 
-__all__ = ["DEFAULT_DATA_DIR", "DEFAULT_OUTPUT_ROOT", "KoBroadcast", "main"]
+__all__ = ["DEFAULT_DATA_DIR", "DEFAULT_OUTPUT_ROOT", "SAE", "main"]
 
-DEFAULT_DATA_DIR = MAF_ROOT / "data" / "kobroadcast"
+DEFAULT_DATA_DIR = MAF_ROOT / "data" / "sae"
 PROMPT = Path(__file__).resolve().parent / "prompts" / "toxicity.md"
 
 
-class KoBroadcast:
+class SAE:
     """제출분 run.py 의 인자·검증을 그대로 받는 MAF 알고리즘 클래스."""
 
     def __init__(
@@ -194,7 +194,7 @@ def parser():
     p.add_argument(
         "--output",
         type=Path,
-        help="New output folder; default result/kobroadcast/<UTC>",
+        help="New output folder; default result/sae/<UTC>",
     )
     p.add_argument("--device", default="auto", help="auto, cpu, or cuda:N")
     p.add_argument(
@@ -227,7 +227,7 @@ def main(argv=None):
     a = p.parse_args(argv)
     options = {k: v for k, v in vars(a).items() if k != "dry_run"}
     try:
-        algorithm = KoBroadcast(**options)
+        algorithm = SAE(**options)
         plan = algorithm.plan()
     except ValueError as error:
         p.error(str(error))
@@ -237,7 +237,7 @@ def main(argv=None):
     try:
         algorithm.run()
     except OSError as error:
-        p.exit(1, f"KoBroadcast failed: {error}\n")
+        p.exit(1, f"SAE failed: {error}\n")
     print(json.dumps(algorithm.summary(), ensure_ascii=False, indent=2))
     return 0
 

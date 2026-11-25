@@ -54,6 +54,9 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Kernel Density Estimator [📃paper](https://proceedings.neurips.cc/paper/2020/hash/ac3870fcad1cfc367825cda0101eee62-Abstract.html) [💻 code](https://github.com/Gyeongjo/FairClassifier_using_KDE)
   * DMLBG
   * FairASR [📃paper](https://arxiv.org/abs/2506.10747) [💻 code](https://github.com/JongSuk1/FairASR)
+  * DEE-MC (Equal-Experience regularized matrix completion, MovieLens-1M) [📃paper](https://arxiv.org/abs/2210.05936)
+  * SAE (Base / Base+SWA / FairBatch / LEACE+SWA, 한국어 방송 문장 유해성 분류; 데이터는 `data/sae/`에 train/dev/test.jsonl 을 직접 두고, 모델은 실행 시 `model/sae/hf`로 자동 다운로드)
+  * KoBBQ-Steer (AlphaSteer null-space 활성화 스티어링으로 KoBBQ 편향 완화, Qwen2.5-7B-Instruct; `run()` → (base, alphasteer) KoBBQ test 지표, `--kmmlu` 로 KMMLU test 추가. 데이터는 `data/kobbq_steer/{ext/KoBBQ, raw/}` 를 직접 준비(패키지 README 절차), 모델은 `model/kobbq_steer/hf` 로 자동 수신, 스티어링 행렬은 없으면 첫 실행이 생성(GPU 약 1시간)) [📃paper](https://arxiv.org/abs/2506.07022)
 
 ### Post-processing Algorithms
 * AIF360
@@ -61,7 +64,7 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Equalized Odds
   * Reject Option Classifier
 * SOTA Algorithm
-  * Causal Path Tracing [📃paper](TBA) [💻 code](TBA)
+  * Causal Path Tracing (언어: pythia-14m / known_1000, 비전: timm ViT-tiny / ImageNet-1k val; 지표 `path_node_ratio`·`decision_kept_ratio`. 모델·known_1000·nltk stopwords는 실행 시 `model/casual_path_tracing/`·`data/casual_path_tracing/`로 자동 수신, ImageNet은 `python -m MAF.datamodule.casual_path_tracing.prepare_imagenet`으로 직접 준비) [📃paper](TBA) [💻 code](TBA)
   * EMBER [📃paper](https://arxiv.org/abs/2410.20774) [💻 code](https://github.com/DongryeolLee96/EMBER)
 
 ## Benchmark
@@ -230,8 +233,8 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴpubfig_attributes.txt
               ㄴRH
                 ㄴRH_dataset.xlsx
-              ㄴcasual_path_tracing
-                ㄴlama_trex.json
+              ㄴcasual_path_tracing # known_1000.json 자동 수신, imagenet/ 은 직접 준비
+              ㄴkobbq_steer # ext/KoBBQ·raw/ 직접 준비, processed/ 자동 생성
               ㄴember # 원본 repo를 통해 full data 다운로드 필수
                 ㄴif
                   ㄴember_if.json

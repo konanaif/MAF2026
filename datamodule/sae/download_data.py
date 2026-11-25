@@ -1,7 +1,7 @@
-"""KoBroadcast 사전학습 모델을 HF Hub에서 model/kobroadcast/hf 로 받는다(없을 때만).
+"""SAE 사전학습 모델을 HF Hub에서 model/sae/hf 로 받는다(없을 때만).
 
-실행: python -m MAF.datamodule.kobroadcast.download_data [--model roberta-base|roberta-large|qwen3-4b|all]
-KoBroadcast.run()이 --model-path 없이 실행될 때 같은 함수(ensure_model)를 먼저 부른다.
+실행: python -m MAF.datamodule.sae.download_data [--model roberta-base|roberta-large|qwen3-4b|all]
+SAE.run()이 --model-path 없이 실행될 때 같은 함수(ensure_model)를 먼저 부른다.
 """
 
 from __future__ import annotations
@@ -10,14 +10,14 @@ import argparse
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
-from MAF.algorithms.inprocessing.kobroadcast.constants import (
+from MAF.algorithms.inprocessing.sae.constants import (
     MODEL_IDS,
     MODEL_REVISIONS,
     MODELS,
 )
 
 MAF_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MODEL_DIR = MAF_ROOT / "model" / "kobroadcast" / "hf"
+DEFAULT_MODEL_DIR = MAF_ROOT / "model" / "sae" / "hf"
 # 고정 revision 3개 모두 safetensors를 제공한다. 다른 형식까지 받으면 용량이 2배다.
 IGNORE_PATTERNS = ["*.bin", "*.h5", "*.msgpack", "*.ot", "*.onnx"]
 
@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name}: {ensure_model(name, args.revision, offline=args.offline)}")
         return 0
     except (OSError, ValueError) as error:
-        parser.exit(1, f"KoBroadcast model setup failed: {error}\n")
+        parser.exit(1, f"SAE model setup failed: {error}\n")
 
 
 if __name__ == "__main__":
