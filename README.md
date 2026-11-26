@@ -301,12 +301,12 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴkobroadcast_silver_test_labels.jsonl
                 ㄴkobroadcast_silver_train_labels.jsonl
                 ㄴoriginal
-                  ㄴ591
-                    ㄴTL1.zip
-                    ㄴVL1.zip
-                  ㄴ71577
-                    ㄴTL.zip
-                    ㄴVL.zip
+                  ㄴ591 # AI Hub 591 방송 콘텐츠 대본 요약 데이터
+                    ㄴVL1.zip # 2.Validation/라벨링데이터/VL1.zip
+                    ㄴTL1.zip # 1.Training/라벨링데이터/TL1.zip
+                  ㄴ71577 # AI Hub 71557 뉴스 대본 및 앵커 음성 데이터
+                    ㄴTL.zip # Training/02.라벨링데이터/TL.zip
+                    ㄴVL.zip # Validation/02.라벨링데이터/VL.zip
                 ㄴtest.jsonl # test.jsonl, train.jsonl, dev.jsonl은 kobroadcast_silver_..._labels.jsonl 파일들과 original 폴더 내 데이터를 세팅 후, algorithms/inprocessing/sae/build_splits.py 파일을 통해 자동생성
                 ㄴtrain.jsonl
                 ㄴdev.jsonl
