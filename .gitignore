@@ -51,7 +51,8 @@ data/ALINCredit/*
 data/ALINMed/*
 !data/ALINMed/download_nih_subset.py
 !data/ALINMed/four_findings_expert_labels_*.csv
-data/sae/
+data/sae/*
+!data/sae/kobroadcast_silver_*_labels.jsonl
 
 data/casual_path_tracing/
 data/kobbq_steer/
