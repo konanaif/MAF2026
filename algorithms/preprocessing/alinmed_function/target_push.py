@@ -34,6 +34,8 @@ Env: /usr/bin/python, torch.device('cuda:0') (external CUDA_VISIBLE_DEVICES),
      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 (rad-DINO / ViT weights cached).
 """
 import os
+# deterministic cuBLAS (must be set before CUDA/cuBLAS initialises; harmless with --nondeterministic)
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 import csv
 import json
 import random
@@ -64,6 +66,7 @@ ROUND_ID = 40
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 RADDINO_HF = "microsoft/rad-dino"
+RADDINO_REV = "110cbc18d5133582e320b43d53bf5c44e410c936"   # pinned revision
 
 # reporting targets
 TARGET_ACC = 94.0     # percent
@@ -77,6 +80,105 @@ def seed_everything(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def set_determinism(enabled=True):
+    """Deterministic mode (default): same seed + same GPU/software -> identical training.
+    cuDNN deterministic algorithms, no cuDNN autotuning, torch.use_deterministic_algorithms
+    (raises on any op without a deterministic implementation instead of silently varying),
+    and a deterministic backward for the rad-DINO position-embedding interpolation (CUDA bicubic
+    backward has no deterministic kernel; the forward values are unchanged).
+    Repeat runs are identical on the same GPU model and library versions; a different GPU or
+    cuDNN/CUDA version can still give slightly different numbers."""
+    torch.backends.cudnn.deterministic = enabled
+    torch.backends.cudnn.benchmark = not enabled and torch.backends.cudnn.benchmark
+    torch.use_deterministic_algorithms(enabled)
+    if enabled:
+        _patch_dinov2_pos_interp()
+
+
+def _bicubic_matrix(n, scale):
+    """A (m x n) with A @ v == F.interpolate(v, scale_factor=scale, mode='bicubic', align_corners=False)
+    along one axis (bicubic is separable; a column of constants interpolates to itself across)."""
+    e = torch.eye(n, dtype=torch.float32).reshape(n, 1, n, 1).expand(n, 1, n, 4).contiguous()
+    y = torch.nn.functional.interpolate(e, scale_factor=(scale, 1.0), mode="bicubic", align_corners=False)
+    return y[:, 0, :, 0].t().contiguous()          # (m, n)
+
+
+class _BicubicPosInterp(torch.autograd.Function):
+    """Forward: the original F.interpolate(bicubic) call, so values are bit-identical to the
+    unpatched model. Backward: the same linear map transposed, A_h^T @ G @ A_w, instead of the
+    CUDA bicubic backward kernel (which has no deterministic implementation)."""
+
+    @staticmethod
+    def forward(ctx, p, sh, sw, a_h, a_w):                 # p: (1, C, n, n)
+        ctx.save_for_backward(a_h, a_w)
+        return torch.nn.functional.interpolate(p, scale_factor=(sh, sw), mode="bicubic",
+                                               align_corners=False)
+
+    @staticmethod
+    def backward(ctx, g):                                  # g: (1, C, H', W')
+        a_h, a_w = ctx.saved_tensors
+        return torch.einsum("ih,ncij,jw->nchw", a_h, g, a_w), None, None, None, None
+
+
+_DINO_PATCHED = False
+
+
+def _patch_dinov2_pos_interp():
+    """Dinov2Embeddings.interpolate_pos_encoding with a deterministic backward for the bicubic
+    position-embedding interpolation (see _BicubicPosInterp). Forward values are unchanged and
+    there are no new parameters (state_dict unchanged)."""
+    global _DINO_PATCHED
+    if _DINO_PATCHED:
+        return
+    try:
+        import math
+        from transformers.models.dinov2 import modeling_dinov2 as md
+    except Exception:
+        return
+    cache = {}
+
+    def interpolate_pos_encoding(self, embeddings, height, width):
+        num_patches = embeddings.shape[1] - 1
+        num_positions = self.position_embeddings.shape[1] - 1
+        if num_patches == num_positions and height == width:
+            return self.position_embeddings
+        class_pos_embed = self.position_embeddings[:, 0]
+        patch_pos_embed = self.position_embeddings[:, 1:]
+        dim = embeddings.shape[-1]
+        n = int(math.sqrt(num_positions))
+        h = height // self.config.patch_size + 0.1      # as in transformers (dino issue #8)
+        w = width // self.config.patch_size + 0.1
+        sh, sw = float(h / math.sqrt(num_positions)), float(w / math.sqrt(num_positions))
+        key = (n, sh, sw, patch_pos_embed.device)
+        if key not in cache:
+            cache[key] = (_bicubic_matrix(n, sh).to(patch_pos_embed.device),
+                          _bicubic_matrix(n, sw).to(patch_pos_embed.device))
+        a_h, a_w = cache[key]
+        target_dtype = patch_pos_embed.dtype
+        p = patch_pos_embed.reshape(1, n, n, dim).permute(0, 3, 1, 2).to(dtype=torch.float32)
+        p = _BicubicPosInterp.apply(p, sh, sw, a_h, a_w).to(dtype=target_dtype)
+        if int(h) != p.shape[-2] or int(w) != p.shape[-1]:
+            raise ValueError("Width or height does not match with the interpolated position embeddings")
+        p = p.permute(0, 2, 3, 1).reshape(1, -1, dim)
+        return torch.cat((class_pos_embed.unsqueeze(0), p), dim=1)
+
+    md.Dinov2Embeddings._orig_interpolate_pos_encoding = md.Dinov2Embeddings.interpolate_pos_encoding
+    md.Dinov2Embeddings.interpolate_pos_encoding = interpolate_pos_encoding
+    _DINO_PATCHED = True
+
+
+def _worker_init_fn(worker_id):
+    """DataLoader worker seeding, explicit: numpy / random from the worker's torch seed
+    (which the loader's generator fixes)."""
+    s = torch.initial_seed() % 2 ** 32
+    np.random.seed(s)
+    random.seed(s)
+
+
+def _loader_generator(seed):
+    return torch.Generator().manual_seed(seed)
 
 
 def find_image_path(img_name):
@@ -185,7 +287,7 @@ class RadDinoClassifier(nn.Module):
     def __init__(self, num_classes=2, hf_name=RADDINO_HF):
         super().__init__()
         from transformers import AutoModel
-        self.backbone = AutoModel.from_pretrained(hf_name)
+        self.backbone = AutoModel.from_pretrained(hf_name, revision=RADDINO_REV)
         h = self.backbone.config.hidden_size
         self.head = nn.Linear(h, num_classes)
 
@@ -239,7 +341,7 @@ def build_model(backbone, device):
         mean, std = IMAGENET_MEAN, IMAGENET_STD
         try:
             from transformers import AutoImageProcessor
-            proc = AutoImageProcessor.from_pretrained(RADDINO_HF)
+            proc = AutoImageProcessor.from_pretrained(RADDINO_HF, revision=RADDINO_REV)
             mean = list(proc.image_mean)
             std = list(proc.image_std)
         except Exception as e:
@@ -267,7 +369,7 @@ def build_optimizer(model, backbone, is_transformer, lr):
 
 
 # ------------------------------------------------------------------ sampler
-def build_fair_sampler(train_dataset):
+def build_fair_sampler(train_dataset, generator=None):
     """EXACT replication of train.py fairness: WeightedRandomSampler across
     (cond_label x gender) subgroups with weight = max_group_size / group_size."""
     group_dict = defaultdict(list)
@@ -281,7 +383,7 @@ def build_fair_sampler(train_dataset):
         w = float(max_size / len(idxs)) if len(idxs) > 0 else 1.0
         for i in idxs:
             sample_weights[i] = w
-    sampler = WeightedRandomSampler(sample_weights, len(meta))
+    sampler = WeightedRandomSampler(sample_weights, len(meta), generator=generator)
     return sampler, {str(k): v for k, v in group_sizes.items()}
 
 
@@ -344,17 +446,20 @@ def train_variant(rows, train_idx, test_idx, args, use_fairness, device):
     train_ds = CleanChestDataset(rows, transform=train_tf, indices=train_idx, verbose=False)
     test_ds = CleanChestDataset(rows, transform=test_tf, indices=test_idx, verbose=False)
 
+    gen = _loader_generator(args.seed)     # sampler order + worker seeds (augmentation)
     if use_fairness:
-        sampler, groups = build_fair_sampler(train_ds)
+        sampler, groups = build_fair_sampler(train_ds, generator=gen)
         print(f"[{tag}] WeightedRandomSampler groups(label,gender)->size: {groups}")
         train_loader = DataLoader(train_ds, batch_size=args.batch_size, sampler=sampler,
-                                  shuffle=False, drop_last=False, num_workers=args.num_workers)
+                                  shuffle=False, drop_last=False, num_workers=args.num_workers,
+                                  generator=gen, worker_init_fn=_worker_init_fn)
     else:
         print(f"[{tag}] standard shuffle")
         train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
-                                  drop_last=False, num_workers=args.num_workers)
+                                  drop_last=False, num_workers=args.num_workers,
+                                  generator=gen, worker_init_fn=_worker_init_fn)
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
-                             num_workers=args.num_workers)
+                             num_workers=args.num_workers, worker_init_fn=_worker_init_fn)
 
     criterion = make_criterion(train_ds, args.fix_classweight, device)
     optimizer = build_optimizer(model, args.backbone, is_tf, args.lr)
@@ -476,11 +581,14 @@ def run_smoke(args, device):
 
 # ------------------------------------------------------------------ full run
 def run_full(args, device):
+    set_determinism(not getattr(args, "nondeterministic", False))
     tag = f"{args.backbone}_e{args.epochs}_{args.aug}"
     if args.fix_classweight:
         tag += "_cw"
     if args.tta:
         tag += "_tta"
+    if not getattr(args, "nondeterministic", False):
+        tag += "_det"
     tag += f"_s{args.seed}"
     print("=" * 70)
     print(f"TARGET PUSH full run: {tag}  (seed={args.seed})")
@@ -570,16 +678,19 @@ def build_argparser():
     p.add_argument("--fix_classweight", action="store_true",
                    help="apply balanced class-weighted CE (train.py had it disabled)")
     p.add_argument("--tta", action="store_true", help="hflip test-time augmentation")
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=3)
     p.add_argument("--lr", type=float, default=5e-5)
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--num_workers", type=int, default=4)
     p.add_argument("--smoke", action="store_true", help="build+1-batch checks, no training")
+    p.add_argument("--nondeterministic", action="store_true",
+                   help="turn off the deterministic mode (faster cuDNN autotuning, runs may differ)")
     return p
 
 
 def main():
     args = build_argparser().parse_args()
+    set_determinism(not args.nondeterministic)
     seed_everything(args.seed)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"[Env] device={device} CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')} "
