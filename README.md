@@ -54,6 +54,9 @@ AIF360의 알고리즘 및 편향성 완화와 관련한 최신 연구들을 포
   * Kernel Density Estimator [📃paper](https://proceedings.neurips.cc/paper/2020/hash/ac3870fcad1cfc367825cda0101eee62-Abstract.html) [💻 code](https://github.com/Gyeongjo/FairClassifier_using_KDE)
   * DMLBG
   * FairASR [📃paper](https://arxiv.org/abs/2506.10747) [💻 code](https://github.com/JongSuk1/FairASR)
+  * DEE-MC
+  * SAE
+  * KoBBQ-Steer
   * ALINCredit [💻 code](https://github.com/jhoonjwa/ALINCredit)
   * DRAF [📃paper](https://arxiv.org/abs/2510.21091) [💻 code](https://github.com/subgroup-fair/draf)
   * RG-TTA
@@ -139,6 +142,7 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
      - COMPAS [📚 data](https://github.com/propublica/compas-analysis/)
      - German credit scoring [📚 data](https://archive.ics.uci.edu/dataset/144/statlog+german+credit+data)
      - Adult Census Income [📚 data](https://archive.ics.uci.edu/dataset/2/adult)
+     - MovieLens 1M [📚 data](https://grouplens.org/datasets/movielens/1m/)
      - Credit Union (ALINCredit): 공개 신용 데이터셋 8종을 하나의 합집합 피처 공간으로 통합
        - [📚 German Credit](https://archive.ics.uci.edu/dataset/144/statlog+german+credit+data), [📚 Taiwan Credit Card Default](https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients), [📚 Credit Approval](https://archive.ics.uci.edu/dataset/27/credit+approval), [📚 Australian Credit](https://archive.ics.uci.edu/dataset/143/statlog+australian+credit+approval)
        - [📚 LendingClub 2007–2011](https://github.com/jhoonjwa/ALINCredit/blob/main/data/lendingclub.csv), [📚 Prosper Loans](https://s3.amazonaws.com/udacity-hosted-downloads/ud651/prosperLoanData.csv), [📚 Home Credit Default Risk](https://huggingface.co/datasets/mohameddhameem/home-credit-default-risk), [📚 HMEQ](http://www.creditriskanalytics.net/uploads/1/9/5/1/19511601/hmeq.csv)
@@ -150,6 +154,7 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
        - 해당 데이터는 datamodule/dataset.py - CelebADataset를 통해 로드됩니다. 시스템 메모리에 따라 CelebADataset 클래스 내 dask.dataframe.from_pandas() 함수의 npartitions 변수값 조정이 필요할 수 있습니다. (https://docs.dask.org/en/stable/generated/dask.dataframe.from_pandas.html?highlight=from_pandas#dask.dataframe.from_pandas)
      - NIH ChestX-ray14 [📚 data](https://huggingface.co/datasets/alkzar90/NIH-Chest-X-ray-dataset)
      - UTKFace [📚 data](https://susanqq.github.io/UTKFace/)
+     - ImageNet-1k val [📚 data](https://huggingface.co/datasets/mrm8488/ImageNet1K-val)
 
    - text
      - KoBBQ [📚 data](https://github.com/naver-ai/KoBBQ/tree/main)
@@ -167,6 +172,7 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
      - RH [📚 data](https://github.com/jongwonryu/RH)
      - Koglish [📚 data](https://huggingface.co/Jangyeong)
      - ember [📚 data](https://github.com/DongryeolLee96/EMBER) #full data
+     - Knowns1000 (ROME known_1000) [📚 data](https://rome.baulab.info/data/dsets/known_1000.json)
 
     - audio
       - esyoon/coraal_clean_test [📚 data](https://huggingface.co/datasets/esyoon/coraal_clean_test)
@@ -177,6 +183,7 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
     - Fair Dimension Filtering
          - Filter_model.th [📚 model](https://drive.google.com/file/d/1hVqq23fLlC2T8GPbpPTSQT15I3l-52fO/view?usp=drive_link)
          - baseline.th [📚 model](https://drive.google.com/file/d/1qO9FWVOJpIvQKUEA_2BVQr66hodsXKvQ/view?usp=drive_link)
+    - DEEMC [📚 model]()
 
    개별 알고리즘에 따른 데이터 및 모델 세팅이 필요합니다. 데이터와 모델은 각각 data와 model 폴더를 생성하여 다음과 같은 구조로 설정합니다.
 
@@ -220,6 +227,16 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
               ㄴcrehate
                 ㄴCREHate_CP.csv
                 ㄴCREHate_SBIC.csv
+              ㄴcasual_path_tracing
+                ㄴimagenet
+                ㄴknown_1000.json
+                ㄴknowns_n_lv.pt
+              ㄴdeemc
+                ㄴmovielens_1m_dataset.dat
+                ㄴmovies.dat
+                ㄴsplit_indices.npz
+                ㄴsplit_manifest.json
+                ㄴusers.dat
               ㄴgerman
                 ㄴgerman.data
               ㄴINTapt
@@ -255,8 +272,6 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴpubfig_attributes.txt
               ㄴRH
                 ㄴRH_dataset.xlsx
-              ㄴcasual_path_tracing
-                ㄴlama_trex.json
               ㄴutkface
                   ㄴgender/utkface
                     ㄴtest/ViT-B-16.pt
@@ -272,7 +287,29 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
                 ㄴqa
                   ㄴember_qa_gpt4.json
                   ㄴember_qa_newbing.json
-              
+              ㄴkobbq_steer
+                ㄴext/KoBBQ # git clone https://github.com/naver-ai/KoBBQ
+                ㄴraw #hugging face에서 KMMLU, kullm-v2, KOpen-platypus, gsm8k-ko, ko-code-alpaca-QA 데이터셋 로드
+                  ㄴCarrotAI__ko-code-alpaca-QA
+                  ㄴHAERAE-HUB__KMMLU
+                  ㄴkuotient__gsm8k-ko
+                  ㄴkyujinpy__KOpen-platypus
+                  ㄴnlpai-lab__kullm-v2
+                ㄴprocessed # datamodule/kobbq_steer/prepare_data.py  실행 시 생성
+              ㄴsae
+                ㄴkobroadcast_silver_dev_labels.jsonl
+                ㄴkobroadcast_silver_test_labels.jsonl
+                ㄴkobroadcast_silver_train_labels.jsonl
+                ㄴoriginal
+                  ㄴ591
+                    ㄴTL1.zip
+                    ㄴVL1.zip
+                  ㄴ71577
+                    ㄴTL.zip
+                    ㄴVL.zip
+                ㄴtest.jsonl # test.jsonl, train.jsonl, dev.jsonl은 kobroadcast_silver_..._labels.jsonl 파일들과 original 폴더 내 데이터를 세팅 후, algorithms/inprocessing/sae/build_splits.py 파일을 통해 자동생성
+                ㄴtrain.jsonl
+                ㄴdev.jsonl
          ```
 
         4-2. model
@@ -285,4 +322,11 @@ MAF의 원활한 구동을 위해서는 특정 버전의 패키지들이 필요�
               ㄴFairFiltering
                 ㄴbaseline.th
                 ㄴFilter_model.th
+              ㄴdeemc
+                ㄴlambda0
+                  ㄴmodel_001.pt
+                  ㄴmodel_002.pt
+                ㄴmf_model.pt
+                ㄴmodel_001.pt
+                ㄴmodel_002.pt
         ```
