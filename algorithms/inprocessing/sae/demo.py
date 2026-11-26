@@ -1,7 +1,4 @@
-"""SAE 데모: 요청마다 합성 예제로 네 기법을 새로 학습·평가해 summary() 를 표용 dict 로 돌려준다.
-
-GPU 전용(CPU 는 약 5분이라 거부). 출력은 result/sae/demo_tmp/ 아래 임시 폴더에 쓰고 읽은 뒤 그
-폴더만 지운다(한 실행이 체크포인트 1.3 GB 를 남기므로; 데모 작업 한정 허용 U3).
+"""SAE 데모: 저장된 결과(result/sae/demo_result.json)가 있으면 그대로, 없으면 네 기법을 1회 학습·평가해 저장한다.
 
 실행: python -m MAF.algorithms.inprocessing.sae.demo [--device auto|cuda:N]
 """
@@ -10,9 +7,11 @@ import argparse
 import json
 import logging
 import math
+import os
 import shutil
 import tempfile
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
 
@@ -36,11 +35,40 @@ METHOD_LABELS = {
 COUNT_KEYS = ("tn", "fp", "fn", "tp")
 METRIC_KEYS = ("accuracy", "toxic_f1", "macro_f1", "precision", "recall", "fpr")
 HIGHER_BETTER = frozenset({"accuracy", "toxic_f1", "macro_f1", "precision", "recall"})
-SYNTHETIC_DIR = DEFAULT_DATA_DIR / "synthetic"
 DEMO_TMP_ROOT = DEFAULT_OUTPUT_ROOT / "demo_tmp"
+DEMO_RESULT = DEFAULT_OUTPUT_ROOT / "demo_result.json"
+RESULT_KEYS = ("methods", "labels", "data", "argmax", "calibrated", "threshold")
+KST = timezone(timedelta(hours=9))
 
-# 요청이 겹치면 직렬화: GPU 학습 두 개를 동시에 돌리지 않는다
+# 요청이 겹치면 직렬화: 첫 학습 중 들어온 요청은 기다렸다가 저장된 결과를 읽는다
 _LOCK = threading.Lock()
+
+
+def _load_saved():
+    try:
+        saved = json.loads(DEMO_RESULT.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        log.warning("saved demo result unreadable, training again: %s", DEMO_RESULT)
+        return None
+    if not isinstance(saved, dict) or any(k not in saved for k in RESULT_KEYS):
+        log.warning("saved demo result incomplete, training again: %s", DEMO_RESULT)
+        return None
+    return saved
+
+
+def _save(result):
+    try:
+        DEMO_RESULT.parent.mkdir(parents=True, exist_ok=True)
+        tmp = DEMO_RESULT.with_name(DEMO_RESULT.name + ".tmp")
+        tmp.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False),
+            encoding="utf-8",
+        )
+        os.replace(tmp, DEMO_RESULT)
+    except OSError:
+        log.exception("demo result not saved, next request trains again")
 
 
 def _number(value):
@@ -58,12 +86,13 @@ def _block(metrics):
     return {k: _number(metrics.get(k)) for k in ("n", *COUNT_KEYS, *METRIC_KEYS)}
 
 
-def run_demo(device="auto", data_dir=SYNTHETIC_DIR):
-    if not torch.cuda.is_available():
-        raise RuntimeError(
-            "demo needs a CUDA device (CPU training takes about 5 minutes)"
-        )
+def run_demo(device="auto", data_dir=DEFAULT_DATA_DIR):
     with _LOCK:
+        saved = _load_saved()
+        if saved is not None:
+            return saved
+        if not torch.cuda.is_available():
+            raise RuntimeError("demo needs a CUDA device for the first training run")
         started = perf_counter()
         DEMO_TMP_ROOT.mkdir(parents=True, exist_ok=True)
         tmp = Path(tempfile.mkdtemp(prefix="run_", dir=DEMO_TMP_ROOT))
@@ -83,19 +112,21 @@ def run_demo(device="auto", data_dir=SYNTHETIC_DIR):
                 shutil.rmtree(tmp)
             except OSError:
                 log.warning("temp output not removed: %s", tmp)
-        elapsed = perf_counter() - started
-    splits = plan["data"]["splits"]
-    methods = [m for m in METHODS if m in summary]
-    return {
-        "model": MODEL,
-        "methods": methods,
-        "labels": dict(METHOD_LABELS),
-        "data": {s: int(splits[s]["n"]) for s in ("train", "dev", "test")},
-        "argmax": {m: _block(summary[m]["argmax"]) for m in methods},
-        "calibrated": {m: _block(summary[m]["calibrated"]) for m in methods},
-        "threshold": {m: _number(summary[m]["threshold"]) for m in methods},
-        "elapsed_seconds": elapsed,
-    }
+        splits = plan["data"]["splits"]
+        methods = [m for m in METHODS if m in summary]
+        result = {
+            "model": MODEL,
+            "methods": methods,
+            "labels": dict(METHOD_LABELS),
+            "data": {s: int(splits[s]["n"]) for s in ("train", "dev", "test")},
+            "argmax": {m: _block(summary[m]["argmax"]) for m in methods},
+            "calibrated": {m: _block(summary[m]["calibrated"]) for m in methods},
+            "threshold": {m: _number(summary[m]["threshold"]) for m in methods},
+            "elapsed_seconds": perf_counter() - started,
+            "trained_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
+        }
+        _save(result)
+        return result
 
 
 def main(argv=None):
